@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emergency Vehicle Navigation</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <style>
+        #map { height: 600px; width: 100%; }
+        #form-container { margin: 20px; }
+        #info { margin: 10px; font-family: Arial, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="form-container">
+        <form id="route-form">
+            <input type="text" name="start" placeholder="Start Location" required>
+            <input type="text" name="end" placeholder="Destination" required>
+            <button type="submit">Plan Route</button>
+        </form>
+    </div>
+    <div id="info">
+        <p>Ambulance Location: <span id="ambulance-loc">N/A</span></p>
+        <p>Distance to Nearest Signal: <span id="distance">N/A</span> meters</p>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        let map, vehicleMarker, routeLayer, nearestSignalMarker, signalMarkers = [];
+        
+        map = L.map('map').setView([51.505, -0.09], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        document.getElementById('route-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await axios.post('/plan_route', formData);
+                const { start, route, signals } = response.data;
+
+                if (routeLayer) map.removeLayer(routeLayer);
+                if (vehicleMarker) map.removeLayer(vehicleMarker);
+                if (nearestSignalMarker) map.removeLayer(nearestSignalMarker);
+                signalMarkers.forEach(marker => map.removeLayer(marker));
+                signalMarkers = [];
+
+                routeLayer = L.polyline(route, {color: 'blue', weight: 5}).addTo(map);
+                
+                signals.forEach(signal => {
+                    const marker = L.marker([signal.latitude, signal.longitude], {
+                        icon: L.icon({
+                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',  // All signals red initially
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41]
+                        })
+                    }).addTo(map);
+                    signalMarkers.push(marker);
+                });
+
+                vehicleMarker = L.circleMarker([start[0], start[1]], {
+                    color: 'black',  // Ambulance now black
+                    radius: 10
+                }).addTo(map);
+
+                map.fitBounds(routeLayer.getBounds());
+                updateVehiclePosition();
+            } catch (error) {
+                console.error('Error planning route:', error);
+                alert('Failed to plan route: ' + error.message);
+            }
+        });
+
+        function updateVehiclePosition() {
+            const interval = setInterval(async () => {
+                try {
+                    const response = await axios.get('/get_vehicle_location');
+                    const { location, nearestSignal, distanceToNearest, ambulanceColor } = response.data;
+                    
+                    if (location && location.latitude && location.longitude) {
+                        vehicleMarker.setLatLng([location.latitude, location.longitude]);
+                        vehicleMarker.setStyle({ color: ambulanceColor });  // Ensure black
+                        map.panTo([location.latitude, location.longitude], {animate: true, duration: 0.1});
+                        
+                        document.getElementById('ambulance-loc').textContent = 
+                            `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`;
+                        
+                        if (nearestSignal) {
+                            if (nearestSignalMarker) {
+                                nearestSignalMarker.setLatLng([nearestSignal.latitude, nearestSignal.longitude]);
+                            } else {
+                                nearestSignalMarker = L.marker([nearestSignal.latitude, nearestSignal.longitude], {
+                                    icon: L.icon({
+                                        iconUrl: distanceToNearest < 100 ? 
+                                            'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png' : 
+                                            'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                                        iconSize: [25, 41],
+                                        iconAnchor: [12, 41]
+                                    })
+                                }).addTo(map);
+                            }
+                            nearestSignalMarker.setIcon(L.icon({
+                                iconUrl: distanceToNearest < 100 ? 
+                                    'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png' : 
+                                    'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41]
+                            }));
+                            document.getElementById('distance').textContent = distanceToNearest || 'N/A';
+                        } else {
+                            document.getElementById('distance').textContent = 'N/A';
+                            if (nearestSignalMarker) {
+                                map.removeLayer(nearestSignalMarker);
+                                nearestSignalMarker = null;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error updating position:', error);
+                    clearInterval(interval);
+                }
+            }, 100);
+        }
+    </script>
+</body>
+</html>
