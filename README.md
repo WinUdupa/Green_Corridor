@@ -50,16 +50,3 @@ Green Corridor is an innovative web application designed to optimize emergency v
 3. Observe real-time route updates and traffic signal adjustments.
 4. Test different scenarios to evaluate the green corridor’s efficiency.
 
-## Contributing
-We welcome contributions to enhance Green Corridor! To contribute:
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/enhance-routing`).
-3. Commit your changes (`git commit -m 'Add enhanced routing algorithm'`).
-4. Push to the branch (`git push origin feature/enhance-routing`).
-5. Open a pull request with a detailed description of your changes.
-
-## License
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contact
-For questions, suggestions, or bug reports, please open an issue on [GitHub](https://github.com/WinUdupa/Green-Corridor/issues) or contact the maintainer.
